@@ -3073,7 +3073,19 @@
     <bcf:citekey order="1" intorder="1">broderick2020automatic</bcf:citekey>
     <bcf:citekey order="2" intorder="1">chatterjee1986influential</bcf:citekey>
     <bcf:citekey order="2" intorder="2">rousseeuw1990unmasking</bcf:citekey>
-    <bcf:citekey order="3" intorder="1">kuschnig2021hidden</bcf:citekey>
+    <bcf:citekey order="3" intorder="1">hampel1974influence</bcf:citekey>
+    <bcf:citekey order="4" intorder="1">kuschnig2021hidden</bcf:citekey>
+    <bcf:citekey order="5" intorder="1">cook2000detection</bcf:citekey>
+    <bcf:citekey order="6" intorder="1">rousseeuw2003robust</bcf:citekey>
+    <bcf:citekey order="7" intorder="1">hadi1993procedures</bcf:citekey>
+    <bcf:citekey order="8" intorder="1">zhao2019multiple</bcf:citekey>
+    <bcf:citekey order="8" intorder="2">rousseeuw1990unmasking</bcf:citekey>
+    <bcf:citekey order="9" intorder="1">rousseeuw2011robust</bcf:citekey>
+    <bcf:citekey order="9" intorder="2">xie2022partial</bcf:citekey>
+    <bcf:citekey order="10" intorder="1">yohai1987high</bcf:citekey>
+    <bcf:citekey order="10" intorder="2">avella2018influence</bcf:citekey>
+    <bcf:citekey order="11" intorder="1">riani2014monitoring</bcf:citekey>
+    <bcf:citekey order="12" intorder="1">hossjer1995exact</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="apa">
