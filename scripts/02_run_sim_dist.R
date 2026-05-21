@@ -280,7 +280,7 @@ results %>%
   filter(outlier_method == "none") %>%
   group_by(n_obs, contam_prop) %>%
   summarise(
-    EVD     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
+    MIS     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
     Cooks   = round(mean(cover_cooks, na.rm = TRUE) * 100, 1),
     Lev     = round(mean(cover_lev, na.rm = TRUE) * 100, 1),
     DFBETAS = round(mean(cover_dfbetas, na.rm = TRUE) * 100, 1),
@@ -295,7 +295,7 @@ results %>%
   filter(outlier_method != "none") %>%
   group_by(n_obs, contam_prop, outlier_method) %>%
   summarise(
-    EVD     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
+    MIS     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
     Cooks   = round(mean(cover_cooks, na.rm = TRUE) * 100, 1),
     Lev     = round(mean(cover_lev, na.rm = TRUE) * 100, 1),
     DFBETAS = round(mean(cover_dfbetas, na.rm = TRUE) * 100, 1),
@@ -309,7 +309,7 @@ results %>%
   filter(outlier_method == "bad_leverage") %>%
   group_by(n_obs, contam_prop, error_type) %>%
   summarise(
-    EVD     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
+    MIS     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
     Cooks   = round(mean(cover_cooks, na.rm = TRUE) * 100, 1),
     Lev     = round(mean(cover_lev, na.rm = TRUE) * 100, 1),
     DFBETAS = round(mean(cover_dfbetas, na.rm = TRUE) * 100, 1),
@@ -324,7 +324,7 @@ results %>%
   group_by(evd_quality, outlier_method) %>%
   summarise(
     n_rows  = n(),
-    EVD     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
+    MIS     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
     Cooks   = round(mean(cover_cooks, na.rm = TRUE) * 100, 1),
     Lev     = round(mean(cover_lev, na.rm = TRUE) * 100, 1),
     DFBETAS = round(mean(cover_dfbetas, na.rm = TRUE) * 100, 1),
@@ -340,7 +340,7 @@ results %>%
   group_by(evd_quality) %>%
   summarise(
     n_rows  = n(),
-    EVD     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
+    MIS     = round(mean(cover_evd, na.rm = TRUE) * 100, 1),
     Cooks   = round(mean(cover_cooks, na.rm = TRUE) * 100, 1),
     Lev     = round(mean(cover_lev, na.rm = TRUE) * 100, 1),
     DFBETAS = round(mean(cover_dfbetas, na.rm = TRUE) * 100, 1),
@@ -392,13 +392,13 @@ results %>%
   filter(outlier_method == "none") %>%
   group_by(n_obs, contam_prop) %>%
   summarise(
-    EVD      = mean(cover_evd, na.rm = TRUE),
+    MIS      = mean(cover_evd, na.rm = TRUE),
     `Cook's D` = mean(cover_cooks, na.rm = TRUE),
     Leverage = mean(cover_lev, na.rm = TRUE),
     DFBETAS  = mean(cover_dfbetas, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  pivot_longer(c(EVD, `Cook's D`, Leverage, DFBETAS),
+  pivot_longer(c(MIS, `Cook's D`, Leverage, DFBETAS),
                names_to = "Method", values_to = "rej_rate") %>%
   ggplot(aes(x = factor(n_obs), y = rej_rate, 
              color = factor(contam_prop), group = factor(contam_prop))) +
@@ -420,13 +420,13 @@ results %>%
   filter(outlier_method == "bad_leverage") %>%
   group_by(n_obs, contam_prop) %>%
   summarise(
-    EVD      = mean(cover_evd, na.rm = TRUE),
+    MIS      = mean(cover_evd, na.rm = TRUE),
     `Cook's D` = mean(cover_cooks, na.rm = TRUE),
     Leverage = mean(cover_lev, na.rm = TRUE),
     DFBETAS  = mean(cover_dfbetas, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  pivot_longer(c(EVD, `Cook's D`, Leverage, DFBETAS),
+  pivot_longer(c(MIS, `Cook's D`, Leverage, DFBETAS),
                names_to = "Method", values_to = "power") %>%
   ggplot(aes(x = factor(contam_prop), y = factor(n_obs), fill = power)) +
   geom_tile(color = "white") +
@@ -445,13 +445,13 @@ results %>%
   filter(outlier_method != "none") %>%
   group_by(n_obs, contam_prop, outlier_method) %>%
   summarise(
-    EVD      = mean(cover_evd, na.rm = TRUE),
+    MIS      = mean(cover_evd, na.rm = TRUE),
     `Cook's D` = mean(cover_cooks, na.rm = TRUE),
     Leverage = mean(cover_lev, na.rm = TRUE),
     DFBETAS  = mean(cover_dfbetas, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  pivot_longer(c(EVD, `Cook's D`, Leverage, DFBETAS),
+  pivot_longer(c(MIS, `Cook's D`, Leverage, DFBETAS),
                names_to = "Method", values_to = "power") %>%
   ggplot(aes(x = contam_prop, y = power, color = Method, 
              linetype = factor(n_obs), group = interaction(Method, n_obs))) +
@@ -500,7 +500,7 @@ results %>%
   geom_boxplot(outlier.size = 0.3, width = 0.7) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
   coord_flip() +
-  labs(title = "EVD Shape Parameter (xi) by Error Distribution and n",
+  labs(title = "MIS Shape Parameter (xi) by Error Distribution and n",
        x = NULL, y = "Shape (xi)", fill = "n") +
   theme_minimal(base_size = 10) -> p6
 print(p6)
