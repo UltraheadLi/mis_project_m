@@ -2,6 +2,7 @@
 # File: /R/exact_dfb_bmx.R
 # Purpose: Exact implementation of the block maxima DFBETA search using 
 #          Dinkelbach's method for linear-fractional programming.
+# Dependencies: Requires helpers_local.R (provides make_blocks)
 # ==============================================================================
 #'
 #' Exact Set Influence Block Maxima
@@ -23,8 +24,8 @@ exact_dfb_bmx <- function(X, R, set, block_count) {
   nS <- length(set)
   block_size <- length(X_inf) %/% block_count
   
-  Xbl <- testingMIS:::make_blocks(X_inf, block_size)
-  Rbl <- testingMIS:::make_blocks(R_inf, block_size)
+  Xbl <- make_blocks(X_inf, block_size)
+  Rbl <- make_blocks(R_inf, block_size)
   
   res <- numeric(block_count)
   

@@ -1,61 +1,203 @@
-\documentclass[11pt]{article}
-\usepackage[top=1.5cm, bottom=1.5cm, left=1.5cm, right=1.5cm]{geometry} \usepackage{setspace}
-\singlespacing 
+\documentclass[12pt]{article}
+\usepackage[top=1.5cm, bottom=1.5cm, left=1.5cm, right=1.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{mathptmx}
 \usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{multirow}
 \usepackage{amssymb}
 \usepackage{booktabs}
 \usepackage[table,xcdraw]{xcolor}
 \usepackage{graphicx}
-\usepackage{natbib} 
-\usepackage{url} 
+\usepackage{url}
 \usepackage{subcaption}
 \usepackage{float}
 \usepackage{titlesec}
+\usepackage[backend=biber, style=apa]{biblatex}
 
 \titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
 \titleformat{\subsubsection}{\small\bfseries}{\thesubsubsection}{1em}{}
+
 \usepackage{hyperref}
-\hypersetup{hypertex=true,
+\hypersetup{
 	colorlinks=true,
 	linkcolor=blue,
 	anchorcolor=blue,
-	citecolor=blue}
+	citecolor=blue
+}
 \newcommand{\blind}{0}
+
+\addbibresource{ref.bib}
 
 \begin{document}
 	\def\spacingset#1{\renewcommand{\baselinestretch}%
 		{#1}\small\normalsize} \spacingset{1}
 	\if0\blind
 	{
-		\title{\bf Most Influential Sets \\  \textemdash  Sensitivity in Statistical Models and Applications}
+		\title{\bf Most Influential Sets \\  \large  Sensitivity in Statistical Models and Applications}
 	\author{%
 		\begin{tabular}{c@{\hspace{2cm}}c}
-			Author: Shi Li & Supervisor: Nikolas Kurchnig
+			Author: Shi Li & Supervisor: Nikolas Kuschnig
 		\end{tabular}
 	}
 		\date{}
-		\maketitle
+		\maketitle \renewcommand{\thefootnote}{\fnsymbol{footnote}}\footnotetext{AI writing assistance was used for proofreading and \LaTeX{} formatting. All analytical work, methodology, and interpretation are the author's own.}\renewcommand{\thefootnote}{\arabic{footnote}}
 	} \fi	
+	
 \section{Introduction}
+The credibility of empirical econometrics depends on the stability of statistical estimators against localized data contamination. Classical leave-one-out diagnostics such as Cook's distance \parencite{cook1979influential} and DFBETAs \parencite{belsley2005regression} evaluate this stability one observation at a time. This pointwise approach leaves them vulnerable to masking, where outlier clusters conceal one another, and to swamping, in which legitimate observations are falsely flagged \parencite{hadi1993procedures, rousseeuw1990unmasking}. High-breakdown robust estimators such as Least Trimmed Squares \parencite{rousseeuw2003robust} and MM-estimators \parencite{yohai1987high} resist contamination globally yet obscure which observations drive the conclusion. The result is a robustness illusion in which fragilities persist undetected \parencite{broderick2020automatic}.
 
-\section{Research Objectives and Contributions}
+The Most Influential Sets (MIS) framework resolves this tension by identifying the exact subset whose joint removal maximally shifts a target coefficient \parencite{kuschnig2021hidden}. \textcite{kuschnig2021hidden} demonstrate that small subsets of observations can remove significance from published findings. Without a formal inferential framework, however, they cannot assess whether such influence is statistically excessive. Building on the EVT-based inferential framework developed by \textcite{konrad2026testing}, this research applies formal significance tests for identified subsets, replacing heuristic thresholds with a rigorous boundary between structural fragility and sampling variation. Monte Carlo simulations validate the methodology, which is then applied to audit contested findings in economics \parencite{nunn2012ruggedness, alsan2015effect} and algorithmic fairness benchmarks \parencite{barocas2020hidden, ding2021retiring, jesus2022turning}.
 
-\section{Current Progress}
+\section{Objectives and Contributions}
 
-\section{Research Design and Methodology}
+This thesis addresses the following research question: Does exact set-level influence identification, combined with Extreme Value Theory inference, provide a statistically superior framework for diagnosing empirical fragility than classical single-observation diagnostics or high-breakdown robust estimators? Three sub-objectives operationalize this question. First, the study compares the exact MIS algorithm against greedy approximations and classical diagnostics in detection accuracy and scalability. Second, it applies the EVT-based inferential framework of \textcite{konrad2026testing} in Monte Carlo simulations to assess whether exact MIS paired with formal significance testing yields superior detection and estimation performance. Third, the framework audits contested findings in economics and algorithmic fairness, testing whether reported effects survive the removal of their most influential subsets.
 
-\section{Work Plan and Timeline}
+This research makes three contributions to the literature. Methodologically, it leverages the exact inferential test for set-level influence developed by \textcite{konrad2026testing} within the MIS framework \parencite{kuschnig2021hidden}, applying formal hypothesis tests that separate genuine model fragility from expected sampling variation to a broader range of data-generating environments than previously examined. Extensive Monte Carlo simulations demonstrate that the MIS framework with EVT-based inference outperforms classical diagnostics and greedy approximations in detection and parameter recovery, even under heteroskedasticity, heavy tails, and severe masking. The framework is also deployed to stress-test contested cross-sectional findings in economics \parencite{nunn2012ruggedness, alsan2015effect} and to interrogate algorithmic fairness benchmarks \parencite{barocas2020hidden, ding2021retiring, jesus2022turning}, providing the first set-level audit of whether observed biases are systemic or artifacts of small influential training clusters \parencite{broderick2020automatic}.
 
-\section{Expected Outcomes and Significance}
+\section{Literature Review}
 
-\section{References}
+The foundational approach to empirical sensitivity relies on single-observation deletion metrics to detect leverage and influence \parencite{cook1979influential, belsley2005regression}. Yet these local diagnostics are structurally vulnerable to masking and swamping, rendering leave-one-out methodologies insufficient for detecting joint influence \parencite{hadi1993procedures, rousseeuw1990unmasking, zhao2019multiple}.  
+
+High-breakdown estimators, such as Least Trimmed Squares and MM-estimators, bypass local detection by globally down-weighting outliers \parencite{rousseeuw2003robust, yohai1987high}. Although resistant to contamination \parencite{huber2009robust}, this approach obscures which specific observations drive the results \parencite{pena1995detection, riani2014monitoring}. These estimators therefore produce an illusion of stability, appearing robust while localized fragilities go undetected.  
+
+These limitations have catalyzed a shift towards algorithmic set-level analysis. Machine learning influence functions \parencite{koh2017understanding, huang2025approximations} and econometric approximations \parencite{broderick2020automatic} estimate worst-case data dropping, yet both systematically underestimate joint influence \parencite{koh2019accuracy, basu2020second}. The exact Most Influential Sets (MIS) framework resolves this by computing maximal influence without linear approximation \parencite{kuschnig2021hidden}. A critical gap persists, however. The literature still lacks a formal inferential foundation to distinguish genuine structural fragility from natural sampling variation. \textcite{konrad2026testing} address this gap by integrating Extreme Value Theory into the MIS framework, replacing empirical thresholds with rigorous statistical hypothesis testing \parencite{coles2001introduction}. The present study builds on their inferential foundation to conduct systematic comparisons across detection and estimation settings.
+
+\section{Methodology}
+
+\subsection{The MIS Framework}
+
+The central tool of this study is the Most Influential Sets (MIS)
+framework \parencite{kuschnig2021hidden}, which identifies the subset
+$S^* \subseteq \{1,\ldots,n\}$ of size $k$ whose joint removal shifts
+a target coefficient $\hat{\beta}_j$ by the largest amount. This shift
+is measured by the set-DFBETA:
+\[
+\mathrm{DFBETA}_j(S) = e_j^\top(X^\top X)^{-1}
+X_S^\top(I - H_{SS})^{-1}r_S.
+\]
+After applying the Frisch-Waugh-Lovell theorem to partial out nuisance regressors, finding $S^*$ reduces to a linear-fractional program, which Dinkelbach's algorithm solves exactly in $O(T \cdot n\log n)$ time \parencite{kuschnig2026finding}. This exactness is the key advantage over greedy approximations, particularly in masking configurations where influential observations conceal one another from sequential search \parencite{hadi1993procedures}. To formally test whether the identified set's influence exceeds what would be expected by chance, a GEV null distribution is fitted to block maxima of the influence statistic following \textcite{konrad2026testing}, and a p-value is computed from the upper tail.
+
+\subsection{Monte Carlo Simulation}
+
+The simulation study pursues two related but distinct objectives. The detection study asks how accurately each method recovers a known influential set that has been planted by design. The estimation study asks a different question, namely how well the resulting OLS estimate recovers the true coefficient after each method flags and removes its identified observations.
+
+The detection study generates data by crossing three predictor distributions, Normal, Skewed-$t$, Pareto) with eight error distributions, namely Normal, Mixed-Normal, Skewed-$t$, GOLM, GPD, Beta-logistic, Contaminated, and Pareto, spanning thin-tailed, heavy-tailed, and multi-modal regimes. A known influential set $S_{\mathrm{inj}}$ of size $k \in \{1,3,5,10\}$ is planted using one of three injection mechanisms. Vertical outliers shift the response only and leave coefficient estimates largely unaffected. Good-leverage points displace predictors while remaining on the regression plane, increasing precision without biasing the slope. Bad leverage displaces both, producing the only configuration that genuinely threatens coefficient stability. Only bad-leverage contamination is therefore a target for MIS detection; the other two topologies serve as negative controls. All shifts are scaled relative to the robust spread of the response. The detection study compares the exact MIS algorithm against Cook's distance, leverage and DFBETAS across the full DGP and injection grid, evaluating how reliably each method recovers the true influential set under masking, heavy tails and heterogeneous contamination structures.
+
+The estimation study uses the same DGP and injection grid at fixed sample size and set size, comparing nine estimators with contaminated OLS as the baseline. Classical diagnostics remove observations flagged by Cook's distance, leverage and DFBETA thresholds before re-estimating. Three MIS variants select $k$ using different rules: a leverage-based iterative peel, an MM-anchored threshold, and an oracle based on the true injection size. MM and LTS estimators are included as direct robust benchmarks. Performance is measured by absolute bias, root mean squared error and 95\% Wald interval coverage of the slope coefficient across 100 replications per scenario.
+
+\subsection{Empirical Applications}
+
+The framework is applied in two domains where the robustness of published findings is contested. In economics, the MIS algorithm is run on the OLS specifications of
+\parencite{nunn2012ruggedness} and \parencite{alsan2015effect} to test whether their headline coefficients hold once the most influential observations are removed. In machine learning fairness, the same approach is applied to the ACS Public Use Microdata Sample \parencite{ding2021retiring} and the Give Me Some Credit dataset \parencite{jesus2022turning} to determine whether observed disparities across demographic groups reflect genuine patterns in the data or are driven by a small cluster of highly influential training observations. The Nunn and Puga dataset comprises 1,129 cross-country observations on terrain ruggedness and economic output, while the Alsan dataset contains 366 observations on tsetse fly suitability and historical development outcomes. Both have been publicly archived and already obtained. The ACS PUMS sample used for algorithmic fairness provides approximately 1.6 million individual-level records with demographic and income variables \parencite{ding2021retiring}. The Give Me Some Credit dataset adds 150,000 borrower records with default labels \parencite{jesus2022turning} and is likewise publicly available on standard benchmarking repositories.
+
+\section{Preliminary Findings}
+
+Section~\ref{ssec:detection} evaluates whether the Most Influential Set framework detects adversarial contamination that classical leave-one-out diagnostics miss. Section~\ref{ssec:estimation} then turns to parameter recovery, evaluating whether MIS-based cleaning produces less biased estimates and better-calibrated confidence intervals than competing approaches.
+
+
+\subsection{Detection Under Masking}
+\label{ssec:detection}
+
+MIS is compared against Cook's Distance, Leverage, and DFBETAS across a  $\times 8 \times 3$ grid of predictor distributions, error distributions, and contamination topologies. Figure~\ref{fig:detection_heatmap} reports detection accuracy aggregated across predictor distributions and stratified by error distribution and topology. Under bad leverage, the only topology that shifts the target coefficient, MIS achieves the highest detection across all error distributions. Its near-zero detection under good leverage and vertical outliers is expected, as these topologies do not distort the coefficient. Classical diagnostics, by contrast, flag observations under these harmless topologies, responding to residual magnitude rather than parameter influence. The elevated MIS detection rate under GPD errors with good leverage is anomalous and remains under investigation.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.5\textwidth]{../output/RP/fig_02_detection_heatmap.pdf}
+	\caption{Detection accuracy across three contamination topologies} 
+	{\footnotesize Each cell reports the proportion of simulations in which injected influential set was correctly identified, aggregated across three predictor distributions. The elevated MIS detection rate under GPD errors with good leverage is anomalous and remains under investigation.}
+	\label{fig:detection_heatmap}
+\end{figure}
+
+
+\subsection{Parameter Recovery After Cleaning}
+\label{ssec:estimation}
+Table~\ref{tab:bias_coverage} reports median absolute bias and 95\% Wald coverage for nine estimators, including three MIS variants distinguished by their rule for selecting $k$ (adaptive, oracle, and iterative peel), aggregated across all distributional combinations and stratified by contamination topology.
+
+Under clean data all methods perform comparably. The topologies diverge under bad-leverage contamination: OLS bias reaches 1.77 and coverage collapses to 0.166, while classical cleaning offers partial recovery, with Cook's D bias at 0.020 and coverage at 0.824. MIS-Peel achieves the lowest bias among cleaning methods at 0.007 and is the only method to maintain near-nominal coverage of 0.980 under bad leverage. MM and LTS attain lower raw bias overall but fall below nominal coverage under good leverage at 0.72, reflecting the efficiency cost of direct robust estimation. MIS-Oracle underperforms MIS-Peel despite access to the true $k$, suggesting that iterative peeling recovers set boundaries more accurately than a single-shot removal.
+
+\begin{table}[H]
+	\centering
+	\vspace{4pt}
+	\footnotesize
+	\setlength{\tabcolsep}{4pt}
+	\resizebox{0.6\textwidth}{!}{%
+		\begin{tabular}{l rrrr rrrr}
+			\toprule
+			& \multicolumn{4}{c}{Panel A: Median Absolute Bias} & \multicolumn{4}{c}{Panel B: 95\% CI Coverage} \\
+			\cmidrule(lr){2-5} \cmidrule(lr){6-9}
+			& No Contam. & Vertical & Good Lev. & Bad Lev. & No Contam. & Vertical & Good Lev. & Bad Lev. \\
+			\midrule
+			OLS (Full)         & 0.0117 & 0.0246 & 0.0125 & 1.7700 & 0.947 & 0.945 & 0.869 & 0.166 \\
+			Cook's D           & 0.0069 & 0.0069 & 0.0080 & 0.0204 & 0.965 & 0.968 & 0.758 & 0.824 \\
+			Leverage           & 0.0319 & 0.0594 & 0.0271 & 0.3630 & 0.945 & 0.948 & 0.955 & 0.625 \\
+			DFBETAS            & 0.0088 & 0.0087 & 0.0089 & 0.0221 & 0.980 & 0.996 & 0.832 & 0.879 \\
+			MIS ($\alpha$-$k$) & 0.0105 & 0.0374 & 0.0113 & 0.0390 & 0.963 & 0.851 & 0.844 & 0.671 \\
+			MIS (Oracle)       & 0.0117 & 0.0746 & 0.0257 & 0.0295 & 0.947 & 0.667 & 0.649 & 0.817 \\
+			MIS (Peel)         & 0.0059 & 0.0080 & 0.0079 & 0.0072 & 0.978 & 0.992 & 0.911 & 0.980\\
+			MM-Estimator       & 0.0034 & 0.0036 & 0.0051 & 0.0037 & 0.948 & 0.946 & 0.722 & 0.937 \\
+			LTS                & 0.0031 & 0.0035 & 0.0046 & 0.0035 & 0.929 & 0.927 & 0.720 & 0.924 \\
+			\bottomrule
+		\end{tabular}%
+	}
+	\caption{Median absolute bias and 95\% CI coverage across nine estimators}
+	{\footnotesize Stratified by contamination topology ($N = 1{,}000$, $k = 20$,
+	magnitude $= 10$, 100 iterations per scenario, aggregated across
+	all distributional combinations). Bold entries indicate the
+	best-performing method within each topology.}
+	\label{tab:bias_coverage}
+\end{table}
+
+
+The exact algorithm based on Dinkelbach method is validated against a greedy heuristic across nine model architectures (including interactions, collinear predictors, and intentional misspecification), four sample sizes ($N \in \{500, 1{,}000, 2{,}000, 5{,}000\}$), and six set sizes ($k \in \{1, 3, 5, 10, 15, 20\}$). The exact method maintains stable detection accuracy across all configurations; full dimensional scaling results are reported in Appendix~\ref{app:scaling}.
+
+\section{Limitations and Expected Outcomes}
+
+\subsection{Methodological Limitations and Risks}
+The proposed methodology faces three primary constraints. Exact MIS identification via linear-fractional programming is computationally intensive \parencite{kuschnig2021hidden}, and scaling to massive datasets or Partial Linear Models necessitates the greedy approximation, which risks convergence to local maxima under severe masking configurations \parencite{rousseeuw1990unmasking}. A related concern is that hypothesis testing relies on asymptotic convergence to Extreme Value Distributions \parencite{konrad2026testing}, so finite-sample block maxima estimation may exhibit bias and potentially compromise p-value calibration \parencite{dombry2019maximum}. Extending the framework to panel data poses a further challenge, as adapting the Frisch-Waugh-Lovell transformation with cluster-robust standard errors involves substantial algebraic complexity; this extension is reserved as a theoretical stretch goal.
+
+\subsection{Expected Outcomes}
+Despite these constraints, the study is expected to produce meaningful advances on several fronts. The research anticipates establishing that exact MIS captures higher-order joint influence and masking effects missed by classical diagnostics \parencite{belsley2005regression}. The present study leverages the EVT-based inference of \textcite{konrad2026testing} to rigorously distinguish genuine model fragility from finite-sample variation across a broad range of simulation environments. Stress-testing recent empirical literature and machine learning benchmarks is also expected to uncover previously undetected fragilities. This study hypothesizes, in particular, that algorithmic bias observed in fairness models \parencite{barocas2020hidden} is frequently not a systemic feature but a localized artifact produced by small, highly influential training subsets. Taken together, these contributions aim to demonstrate that accounting for set-level influence is fundamental for credible predictive and causal inference.
+
+
+\section{Work Plan, Timeline and Thesis Structure}
+
+\begin{itemize}
+	\setlength{\itemsep}{1.5pt}
+	\setlength{\parskip}{1.5pt}
+	\setlength{\parsep}{1.5pt}
+	\item \textbf{May 2026 (Ongoing):} Finalize Monte Carlo simulations comparing the exact MIS framework, classical diagnostics, and robust estimators. Submit 
+	Milestone 2. Write \textit{(Chapter 4)}.
+	
+	\item \textbf{June 2026:} Complete data pre-processing and initiate empirical applications, applying EVT hypothesis tests to economics and machine learning fairness benchmarks. Write \textit{(Chapter 5)}.
+	
+	\item \textbf{July 2026:} Finalize all empirical testing, track non-nestedness events, compute Jaccard similarities, and generate influence trace plots and 
+	summary tables. Write \textit{(Chapters 1 \& 2)}.
+	
+	\item \textbf{August 2026:} Consolidate all findings and draft the full thesis manuscript. Write \textit{(Chapters 3 \& 6)}.
+	
+	\item \textbf{September 2026:} Reserved as a contingency buffer. Edit and polish the thesis draft to publication standard. If time admits, explore MIS extensions to panel data.
+	
+	\item \textbf{October 2026:} Submit thesis (Milestone 4) by October 9. Deliver final presentation (Milestone 5) by October 16.
+	
+\end{itemize}
+
+\noindent The thesis is organised in six chapters: introduction; literature review; methodology covering the MIS algorithm and EVT inference; simulations; empirical applications; and conclusion.
 
 
 
-
-
-
-
-
+\newpage
+\appendix
+\section{Dimensional Scaling Results}
+\label{app:scaling}
+The following tables report detection accuracy of the exact MIS algorithm against the greedy heuristic, stratified by sample size ($N$), set size ($k$), and number of predictors ($B$).
+\input{../output/RP/tab_03a_scaling_N.tex}
+\input{../output/RP/tab_03b_scaling_k.tex}
+\input{../output/RP/tab_03c_scaling_B.tex}
+\clearpage 
+\newpage
+\printbibliography
 \end{document}

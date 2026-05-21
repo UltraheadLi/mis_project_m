@@ -58,7 +58,7 @@ fast_sens_topk <- function(mod, pos, sign, k, max_refine = 5) {
   beta_i_pos <- beta[pos] - leverage_col * res / pmax(1 - hat, 1e-12)
   scores <- beta_i_pos * sign
 
-  top_idx <- order(scores, decreasing = FALSE, method = "radix")[1:k]
+  top_idx <- order(scores, decreasing = TRUE, method = "radix")[1:k]
 
   # Early exit: no refinement needed for k=1 or if disabled
   if (k <= 1 || max_refine == 0) return(top_idx)
@@ -118,7 +118,7 @@ fast_sens_topk <- function(mod, pos, sign, k, max_refine = 5) {
     scores_refined <- delta_pos * sign
 
     # Re-select top-k (most influential = most negative score after sign flip)
-    top_idx <- order(scores_refined, decreasing = FALSE, method = "radix")[1:k]
+    top_idx <- order(scores_refined, decreasing = TRUE, method = "radix")[1:k]
 
     # Convergence check: top-k set hasn't changed
     if (setequal(top_idx, prev_idx)) break

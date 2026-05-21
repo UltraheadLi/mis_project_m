@@ -77,6 +77,31 @@ res_02 <- load_or_simulate_02(input_02)
 res_03 <- load_or_simulate_03(input_03)
 
 # ------------------------------------------------------------------------------
+# DEFENSIVE COLUMN GUARD FOR res_03
+# ------------------------------------------------------------------------------
+if (nrow(res_03) > 0) {
+  res_03_required <- c("converged_exact", "converged_greedy",
+                       "detection_rate_exact", "detection_rate",
+                       "cpu_exact", "cpu_greedy")
+  missing_03 <- setdiff(res_03_required, names(res_03))
+  if (length(missing_03) > 0) {
+    message(
+      "WARNING [82_plot_results.R]: res_03 is missing columns — likely stale chunks.\n",
+      "  Missing: ", paste(missing_03, collapse = ", "), "\n",
+      "  Fix: delete ../output/temp_03/ and re-run Script 03.\n",
+      "  Patching with NA/FALSE so plots can still render (with NAs)."
+    )
+    for (col in missing_03) {
+      if (col %in% c("converged_exact", "converged_greedy")) {
+        res_03[[col]] <- FALSE
+      } else {
+        res_03[[col]] <- NA_real_
+      }
+    }
+  }
+}
+
+# ------------------------------------------------------------------------------
 # 2. Figure Generation
 # ------------------------------------------------------------------------------
 

@@ -4,6 +4,7 @@
 #          the p-value of observed set influence under the fitted GEV distribution. 
 #          Formats output as a flat 1-row data.frame for robust row-binding in 
 #          large-scale simulation loops, catching optimization failures cleanly.
+# Dependencies: Requires helpers_local.R (provides estimate_dfb_evd)
 # ==============================================================================
 
 #' Wrapper for EVT Estimation in Simulations
@@ -16,14 +17,13 @@
 #' 
 #' @return A 1-row data.frame containing GEV parameters, the observed set DFBETA,
 #'         the extreme value p-value, and a convergence flag.
-#' @importFrom testingMIS estimate_dfb_evd
 #' @importFrom evd pgev
 #' @export
 evt_iter <- function(y, x, Z, set, block_count = 20) {
   
   # 1. EVD
   res <- tryCatch({
-    testingMIS::estimate_dfb_evd(
+    estimate_dfb_evd(
       y = y,
       x = x,
       Z = Z,
@@ -63,7 +63,6 @@ evt_iter <- function(y, x, Z, set, block_count = 20) {
     mu_M    <- mu + sigma * (M^xi - 1) / xi
     sigma_M <- sigma * M^xi
   } else {
-    # Gumbel limit (xi -> 0): mu_M = mu + sigma*log(M), sigma unchanged
     mu_M    <- mu + sigma * log(M)
     sigma_M <- sigma
   }

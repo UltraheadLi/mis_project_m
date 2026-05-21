@@ -1,14 +1,25 @@
 # ==============================================================================
 # File: /R/sim_engine.R
 # Purpose: Core simulation wrapper combining DGP, influence injection, MIS 
-#          detection, classical LOO diagnostics, and EVD parameter estimation. 
-#          Orchestrates one complete Monte Carlo iteration: generates data under 
-#          a specified DGP, optionally injects adversarial influence, detects the 
-#          Most Influential Set via exact sensitivity search, computes classical 
-#          diagnostics (Cook's D, Leverage, DFBETAS) as baselines, and fits the 
-#          block-maxima Extreme Value Distribution.
+#          detection, classical LOO diagnostics, coverage comparison, and EVD 
+#          parameter estimation. Orchestrates one complete Monte Carlo iteration.
+#
+# Revision notes (v2):
+#   - Added `alpha` parameter for significance threshold
+#   - Added `contam_prop` output column (k / n)
+#   - Added coverage columns: cover_evd, cover_cooks, cover_lev, cover_dfbetas
+#     These answer: "does the method FLAG the set as influential at level alpha?"
+#     For outlier scenarios → power. For "none" scenarios → empirical size.
+#   - Coverage for classical tools uses the SAME set evaluated by EVD
+#     (injected set or random set), ensuring apples-to-apples comparison.
+#   - CRITICAL FIX: block_count is now adaptive — capped at floor((n-k)/k)
+#     to prevent k > block_size collapse in exact_dfb_bmx. The Dinkelbach
+#     solver within each block selects k observations, so each block must
+#     contain at least k observations: block_size = (n-k)/M >= k → M <= (n-k)/k.
+#     GEV fitting requires at least 3 block maxima, so M >= 3.
+#
 # Dependencies: Requires /R/dgp_factory.R, /R/influence_injector.R, 
-#               /R/evt_iter_dm.R, and /R/exact_dfb_bmx.R to be sourced.
+#               /R/evt_iter_dm.R, /R/exact_dfb_bmx.R, /R/dinkelbach_topk.R
 # ==============================================================================
 #'
 #' @param iter Integer: Iteration ID for tracking across simulation grid
@@ -22,22 +33,76 @@
 #' @param outlier_method Character: Injection strategy from influence_injector
 #'        ("none", "vertical_outlier", "good_leverage", "bad_leverage")
 #' @param k Integer: Size of the influential set to inject and detect (default = 1)
-#' @param magnitude Numeric: Scale multiplier for the adversarial shift (must be > 0, default = 5)
-#' @param block_count Integer: Number of blocks for block-maxima EVD estimation (default = 40)
+#' @param magnitude Numeric: Scale multiplier for the adversarial shift (default = 5)
+#' @param block_count Integer: REQUESTED number of blocks for block-maxima EVD.
+#'        Will be adaptively reduced if k is too large relative to n. (default = 50)
 #' @param dist_param Numeric: Shape/tail parameter passed to dgp_factory (default = 3)
 #' @param mix_prop Numeric: Mixture proportion passed to dgp_factory (default = 0.1)
+#' @param alpha Numeric: Significance level for coverage calculations (default = 0.05)
 #'
 #' @return A flat, 1-row data.frame containing all simulation inputs, detection
-#'         metrics, EVD parameters (shape, scale, loc), the observed set DFBETA,
-#'         the extreme value p-value, convergence flag, and wall-clock time.
+#'         metrics, coverage flags, EVD parameters, and wall-clock time.
 #' @export
 run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
                               x_type = "normal", error_type = "normal",
                               outlier_method = "none", k = 1, magnitude = 5,
-                              block_count = 40, dist_param = 3, mix_prop = 0.1) {
+                              block_count = 50, dist_param = 3, mix_prop = 0.1,
+                              alpha = 0.05) {
   
   if (p != 1) stop("sim_engine currently only supports p = 1.")
   start_time <- Sys.time()
+  
+  # -------------------------------------------------------------------------
+  # 0. Adaptive block_count — prevent k vs block_size collapse
+  # -------------------------------------------------------------------------
+  # In exact_dfb_bmx, the clean sample (n - k) is split into M blocks.
+  # Each block has block_size = (n - k) / M observations.
+  # Dinkelbach selects k observations from each block, so we need:
+  #   block_size >= k  →  (n - k) / M >= k  →  M <= (n - k) / k
+  # GEV fitting requires >= 3 block maxima, so M >= 3.
+  
+  n_clean <- n - k
+  max_feasible_blocks <- floor(n_clean / k)
+  effective_block_count <- min(block_count, max_feasible_blocks)
+  
+  # Quality flag for the EVD estimate based on block count
+  evd_quality <- if (effective_block_count < 3) {
+    "infeasible"
+  } else if (effective_block_count < 10) {
+    "low"
+  } else if (effective_block_count < 20) {
+    "moderate"
+  } else {
+    "good"
+  }
+  
+  if (effective_block_count < 3) {
+    # Cannot fit GEV with fewer than 3 block maxima — return failure row
+    warning(sprintf(
+      "Infeasible (n=%d, k=%d): max %d blocks (need >=3). Skipping EVD.",
+      n, k, max_feasible_blocks
+    ))
+    
+    end_time <- Sys.time()
+    compute_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
+    
+    return(data.frame(
+      iter = iter, n_obs = n, x_type = x_type, error_type = error_type,
+      dist_param = dist_param, outlier_method = outlier_method,
+      magnitude = magnitude, set_size = k, contam_prop = k / n,
+      block_count = effective_block_count, evd_quality = evd_quality,
+      alpha = alpha,
+      detection_success = NA, detect_cooks = NA, detect_lev = NA,
+      detect_dfbetas = NA, overlap_mis = NA, overlap_cooks = NA,
+      overlap_lev = NA, overlap_dfbetas = NA,
+      cover_evd = NA, cover_cooks = NA, cover_lev = NA, cover_dfbetas = NA,
+      evd_test_type = if (outlier_method != "none") "injected" else "random",
+      compute_time = compute_time,
+      shape = NA_real_, scale = NA_real_, loc = NA_real_,
+      set_dfb = NA_real_, p_value = NA_real_, converged = FALSE,
+      stringsAsFactors = FALSE
+    ))
+  }
   
   # -------------------------------------------------------------------------
   # 1. Data Generation & Injection
@@ -63,10 +128,9 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
   # -------------------------------------------------------------------------
   base_model <- lm(y ~ x, data = df_sim)
   
-  # Fast influence detection — replaces 2 × sens() calls
-  # In sim_engine, we only have 1 predictor 'x', so pos is always 2 (Intercept is 1)
-  empirical_mis_pos <- fast_sens_topk(base_model, pos = 2, sign = 1, k = k)
-  empirical_mis_neg <- fast_sens_topk(base_model, pos = 2, sign = -1, k = k)
+  # Exact influence detection via Dinkelbach
+  empirical_mis_pos <- dinkelbach_topk_lm(base_model, pos = 2, sign = 1, k = k)
+  empirical_mis_neg <- dinkelbach_topk_lm(base_model, pos = 2, sign = -1, k = k)
   
   if (outlier_method != "none") {
     # Pick the MIS direction with better overlap for detection metrics
@@ -84,8 +148,9 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
     empirical_mis <- empirical_mis_pos
   }
   
-  # 2b. Classical LOO Diagnostics
-  
+  # -------------------------------------------------------------------------
+  # 2b. Classical LOO Diagnostics — Detection (Top-K overlap)
+  # -------------------------------------------------------------------------
   cooks_vals   <- cooks.distance(base_model)
   lev_vals     <- hatvalues(base_model)
   dfbetas_vals <- dfbetas(base_model)[, "x"]  # slope coefficient
@@ -117,24 +182,35 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
   }
   
   # -------------------------------------------------------------------------
-  # 3. Estimate Extreme Value Distribution (EVD) Parameters
+  # 3. Determine the EVD test set
   # -------------------------------------------------------------------------
-  # POST-SELECTION FIX: Choose the correct set for the EVD test.
-  #   The EVD null is calibrated for a PRE-SPECIFIED (fixed) candidate set.
-  #   Testing the MIS (selected to maximise influence) causes 100% rejection
-  #   even on clean data — classic post-selection bias.
-  #
-  #   - With outliers: test the KNOWN INJECTED indices (ground truth).
-  #     This answers: "is the injected set's influence excessive under the EVD?"
-  #   - Without outliers: test a RANDOM set of size k.
-  #     This answers: "does the EVD test maintain nominal size?"
-  
   if (outlier_method != "none") {
     evd_test_set <- true_injected_indices
   } else {
     evd_test_set <- sample(seq_len(n), k)
   }
   
+  # -------------------------------------------------------------------------
+  # 2c. Coverage — Threshold-based flagging (apples-to-apples comparison)
+  #     All methods are evaluated on the SAME set: evd_test_set.
+  #     For outlier scenarios → power. For "none" → empirical size.
+  # -------------------------------------------------------------------------
+  n_model <- stats::nobs(base_model)
+  p_model <- length(stats::coef(base_model))  # includes intercept
+  
+  thresh_cooks   <- 4 / n_model
+  thresh_lev     <- 2 * p_model / n_model
+  thresh_dfbetas <- 2 / sqrt(n_model)
+  
+  # Evaluate: does ANY point in evd_test_set exceed the threshold?
+  cover_cooks   <- any(cooks_vals[evd_test_set]          > thresh_cooks)
+  cover_lev     <- any(lev_vals[evd_test_set]            > thresh_lev)
+  cover_dfbetas <- any(abs(dfbetas_vals[evd_test_set])   > thresh_dfbetas)
+  
+  # -------------------------------------------------------------------------
+  # 4. Estimate Extreme Value Distribution (EVD) Parameters
+  #    Uses the ADAPTIVE effective_block_count computed in Section 0.
+  # -------------------------------------------------------------------------
   Z_matrix <- matrix(1, nrow = length(dat$y), ncol = 1)
   
   res_exact <- tryCatch({
@@ -143,7 +219,7 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
       x = dat$X[, 1],
       Z = Z_matrix,
       set = evd_test_set,
-      block_count = block_count
+      block_count = effective_block_count
     )
   }, error = function(e) {
     warning(sprintf("evt_iter_dm failed (iter=%d, x=%s, err=%s, outlier=%s): %s",
@@ -167,11 +243,18 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
                                stringsAsFactors = FALSE)
   }
   
+  # EVD coverage: is p_value < alpha?
+  cover_evd <- if (!is.na(res_exact$p_value)) {
+    res_exact$p_value < alpha
+  } else {
+    NA
+  }
+  
   end_time <- Sys.time()
   compute_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
   
   # -------------------------------------------------------------------------
-  # 4. Assemble Tidy Output
+  # 5. Assemble Tidy Output
   # -------------------------------------------------------------------------
   res_df <- data.frame(
     iter = iter,
@@ -182,7 +265,10 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
     outlier_method = outlier_method,
     magnitude = magnitude,
     set_size = k,
-    block_count = block_count,
+    contam_prop = k / n,
+    block_count = effective_block_count,
+    evd_quality = evd_quality,
+    alpha = alpha,
     # MIS detection
     detection_success = detection_success,
     # Classical detection (exact set match)
@@ -194,6 +280,11 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
     overlap_cooks = overlap_cooks,
     overlap_lev = overlap_lev,
     overlap_dfbetas = overlap_dfbetas,
+    # Coverage — threshold-based flagging (power or size)
+    cover_evd = cover_evd,
+    cover_cooks = cover_cooks,
+    cover_lev = cover_lev,
+    cover_dfbetas = cover_dfbetas,
     # Which set was tested by EVD
     evd_test_type = if (outlier_method != "none") "injected" else "random",
     # Timing

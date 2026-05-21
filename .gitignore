@@ -23,8 +23,12 @@ Thumbs.db
 output/
 *.pdf
 *.docx
+*.rds
 
 data/*
 !data/README.md
 !data/example_sample_data.csv
 !data/.gitkeep  
+
+# Remote
+*.sh

@@ -1,9 +1,12 @@
 # ==============================================================================
 # File: /script/04_compare_robust.R
-# Purpose: Orchestrates the cross-comparison of parameter recovery between
-#          OLS, Classical Diagnostics, MIS, LTS, and MM-estimators across the
-#          full DGP grid (3 X distributions x 8 error distributions x 4
-#          contamination topologies = 96 scenarios).
+# Purpose: Orchestrates the cross-comparison with Dinkelbach detector and
+#          iterative peel MIS. Compares 9 estimators:
+#            Full OLS, CD, Leverage, DFBETAS,
+#            MIS-alpha, MIS-oracle, MIS-peel,
+#            MM, LTS
+#          Produces k-diagnostic tables alongside bias/coverage/RMSE.
+#
 # Outputs: ../output/04_robust_comparison_results.rds
 # ==============================================================================
 
@@ -17,29 +20,30 @@ library(robustbase)
 source("../R/dgp_factory.R")
 source("../R/influence_injector.R")
 source("../R/diagnostics_classical.R")
-source("../R/fast_sens_topk.R")
 source("../R/estimators_robust.R")
+source("../R/dynamic_k_adaptive.R")
+source("../R/dinkelbach_topk.R")
+source("../R/leverage_k.R")
+source("../R/iterative_peel_v2.R")
 source("../R/sim_robust_engine.R")
 source("../R/utils_checkpoint.R")
 
 # 2. Global Configuration
 sim_params <- list(
   n_iters   = 100,
-  n_obs     = 1000,
-  set_size  = 20,       # Contamination size (2% of data)
-  magnitude = 10,       # Severe shift
+  n_obs     = 5000,
+  set_size  = 50,
+  magnitude = 10,
   seed      = 20260503
 )
 
 set.seed(sim_params$seed)
 
-# Setup Parallel Workers
-num_workers <- max(1, parallel::detectCores() - 2)
+num_workers <- max(1, future::availableCores() - 2)
 cat(sprintf("Local environment, using %d workers.\n", num_workers))
 plan(multisession, workers = num_workers)
 
 # 3. Define the Full Reality Grid
-#    3 X distributions x 8 error distributions x 4 outlier topologies = 96 cells
 param_grid <- expand.grid(
   x_type         = c("normal", "mixed_normal", "contaminated"),
   error_type     = c("normal", "mixed_normal", "skewed_t", "golm",
@@ -49,16 +53,10 @@ param_grid <- expand.grid(
 )
 
 cat(sprintf(
-  paste0("Starting 04 Robust Comparison Suite.\n",
-         "  X distributions:     %d\n",
-         "  Error distributions: %d\n",
-         "  Outlier topologies:  %d\n",
+  paste0("Starting 04 Robust Comparison Suite (Dinkelbach + Peel).\n",
          "  Total scenarios:     %d\n",
          "  Iterations each:     %d\n",
          "  Total MC draws:      %d\n\n"),
-  length(unique(param_grid$x_type)),
-  length(unique(param_grid$error_type)),
-  length(unique(param_grid$outlier_method)),
   nrow(param_grid),
   sim_params$n_iters,
   nrow(param_grid) * sim_params$n_iters
@@ -81,7 +79,6 @@ for (i in seq_len(nrow(param_grid))) {
               i, nrow(param_grid),
               p_current$x_type, p_current$error_type, p_current$outlier_method))
   
-  # Run iterations in parallel
   scenario_results <- furrr::future_map_dfr(
     seq_len(sim_params$n_iters), function(iter_id) {
       
@@ -105,7 +102,6 @@ for (i in seq_len(nrow(param_grid))) {
       
     }, .options = furrr_options(seed = TRUE))
   
-  # Safely save the chunk
   safe_save_rds(scenario_results, chunk_file)
   cat("Done.\n")
 }
@@ -122,44 +118,85 @@ final_dataset <- compile_checkpoints(
 cat("\nScript 04 execution finished successfully.\n")
 
 # ==============================================================================
-# 6. Quick Sanity Check
+# 6. Diagnostics & Sanity Check
 # ==============================================================================
 library(tidyr)
 
 results <- readRDS("../output/04_robust_comparison_results.rds")
 
-# 6a. Mean Absolute Bias
+# 6a. k-Selection Diagnostic: How does each method count?
+cat("\n--- Mean k Selected by Each Method ---\n")
+k_table <- results %>%
+  group_by(x_type, error_type, outlier_method) %>%
+  summarise(
+    true_k   = mean(set_size, na.rm = TRUE),
+    k_alpha  = mean(k_alpha, na.rm = TRUE),
+    k_oracle = mean(k_oracle, na.rm = TRUE),
+    k_peel   = mean(k_peel, na.rm = TRUE),
+    .groups = "drop"
+  )
+print(k_table, n = Inf)
+
+# 6b. Peel stopping diagnostics
+cat("\n--- Peel Stop Reason Distribution ---\n")
+peel_stops <- results %>%
+  group_by(outlier_method, peel_stop) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(outlier_method) %>%
+  mutate(pct = round(100 * n / sum(n), 1)) %>%
+  arrange(outlier_method, desc(n))
+print(peel_stops, n = Inf)
+
+# 6c. Coverage comparison
+cat("\n--- 95% CI Coverage (%) ---\n")
+cov_table <- results %>%
+  group_by(x_type, error_type, outlier_method) %>%
+  summarise(
+    full      = mean(cov_full, na.rm = TRUE) * 100,
+    cd        = mean(cov_cd, na.rm = TRUE) * 100,
+    lev       = mean(cov_lev, na.rm = TRUE) * 100,
+    dfb       = mean(cov_dfb, na.rm = TRUE) * 100,
+    mis_alpha = mean(cov_mis_alpha, na.rm = TRUE) * 100,
+    mis_oracle= mean(cov_mis_oracle, na.rm = TRUE) * 100,
+    mis_peel  = mean(cov_mis_peel, na.rm = TRUE) * 100,
+    mm        = mean(cov_mm, na.rm = TRUE) * 100,
+    lts       = mean(cov_lts, na.rm = TRUE) * 100,
+    .groups = "drop"
+  )
+print(cov_table, n = Inf)
+
+# 6d. Bias comparison
+cat("\n--- Mean Absolute Bias ---\n")
 bias_table <- results %>%
   group_by(x_type, error_type, outlier_method) %>%
-  summarise(across(starts_with("bias_"),
-                   ~ mean(., na.rm = TRUE),
-                   .names = "{.col}"),
-            .groups = "drop") %>%
-  rename_with(~ gsub("bias_", "", .x), starts_with("bias_"))
-
-cat("\n--- Mean Absolute Bias ---\n")
+  summarise(
+    full      = mean(bias_full, na.rm = TRUE),
+    cd        = mean(bias_cd, na.rm = TRUE),
+    lev       = mean(bias_lev, na.rm = TRUE),
+    dfb       = mean(bias_dfb, na.rm = TRUE),
+    mis_alpha = mean(bias_mis_alpha, na.rm = TRUE),
+    mis_oracle= mean(bias_mis_oracle, na.rm = TRUE),
+    mis_peel  = mean(bias_mis_peel, na.rm = TRUE),
+    mm        = mean(bias_mm, na.rm = TRUE),
+    lts       = mean(bias_lts, na.rm = TRUE),
+    .groups = "drop"
+  )
 print(bias_table, n = Inf)
 
-# 6b. 95% CI Coverage
-coverage_table <- results %>%
-  group_by(x_type, error_type, outlier_method) %>%
-  summarise(across(starts_with("cov_"),
-                   ~ mean(., na.rm = TRUE) * 100,
-                   .names = "{.col}"),
-            .groups = "drop") %>%
-  rename_with(~ gsub("cov_", "", .x), starts_with("cov_"))
-
-cat("\n--- 95% CI Coverage (%) ---\n")
-print(coverage_table, n = Inf)
-
-# 6c. RMSE
+# 6e. RMSE comparison
+cat("\n--- RMSE ---\n")
 rmse_table <- results %>%
   group_by(x_type, error_type, outlier_method) %>%
-  summarise(across(starts_with("coef_"),
-                   ~ sqrt(mean((. - 1)^2, na.rm = TRUE)),
-                   .names = "{.col}"),
-            .groups = "drop") %>%
-  rename_with(~ gsub("coef_", "", .x), starts_with("coef_"))
-
-cat("\n--- Root Mean Square Error (RMSE) ---\n")
+  summarise(
+    full      = sqrt(mean((coef_full - 1)^2, na.rm = TRUE)),
+    cd        = sqrt(mean((coef_cd - 1)^2, na.rm = TRUE)),
+    lev       = sqrt(mean((coef_lev - 1)^2, na.rm = TRUE)),
+    dfb       = sqrt(mean((coef_dfb - 1)^2, na.rm = TRUE)),
+    mis_alpha = sqrt(mean((coef_mis_alpha - 1)^2, na.rm = TRUE)),
+    mis_oracle= sqrt(mean((coef_mis_oracle - 1)^2, na.rm = TRUE)),
+    mis_peel  = sqrt(mean((coef_mis_peel - 1)^2, na.rm = TRUE)),
+    mm        = sqrt(mean((coef_mm - 1)^2, na.rm = TRUE)),
+    lts       = sqrt(mean((coef_lts - 1)^2, na.rm = TRUE)),
+    .groups = "drop"
+  )
 print(rmse_table, n = Inf)

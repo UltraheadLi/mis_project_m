@@ -13,15 +13,19 @@
 # 1. Load Dependencies & Source Engines
 library(dplyr)
 library(purrr)
-library(testingMIS)
-library(influence)
 library(evd)
 library(future)
 library(furrr)
 
-# Source order matters: exact_dfb_bmx BEFORE evt_iter_dm (handoff rule #4)
+# Source order matters:
+#   1. helpers_local.R FIRST (provides fwl, make_blocks, dfbeta_numeric,
+#      dfb_bmx, estimate_dfb_evd — replaces testingMIS)
+#   2. exact_dfb_bmx BEFORE evt_iter_dm (handoff rule #4)
+#   3. fast_sens_topk replaces influence::sens()
+source("../R/helpers_local.R")
 source("../R/03_scaling_dgp.R")
 source("../R/utils_checkpoint.R")
+source("../R/fast_sens_topk.R")
 source("../R/exact_dfb_bmx.R")
 source("../R/evt_iter_dm.R")
 source("../R/evt_iter.R")
@@ -133,13 +137,8 @@ run_scaling_iteration <- function(iter_id, N, k, B, architecture,
     tpos <- dgp_poisoned$target_pos
     
     # D. Detect the influential set via influence::sens()
-    sens_obj <- influence::sens(
-      mod,
-      lambda = influence::set_lambda(
-        "beta_i", pos = tpos, sign = sign(coef(mod)[tpos])
-      )
-    )
-    detected_set <- sens_obj$influence$id[1:k]
+    detected_set <- fast_sens_topk(mod, 
+      pos = tpos, sign = sign(coef(mod)[tpos]), k = k)
     
     # E. Extract FWL components: x = target column, Z = everything else
     #    Z must NEVER contain x (handoff rule #1)
@@ -157,11 +156,8 @@ run_scaling_iteration <- function(iter_id, N, k, B, architecture,
     t_greedy <- as.numeric(difftime(Sys.time(), t_greedy_start, units = "secs"))
     
     # G. Dual-sign detection (Oracle: pick the direction that finds more outliers)
-    sens_pos <- influence::sens(mod, lambda = influence::set_lambda("beta_i", pos = tpos, sign = 1))
-    sens_neg <- influence::sens(mod, lambda = influence::set_lambda("beta_i", pos = tpos, sign = -1))
-    
-    detected_pos <- sens_pos$influence$id[1:k]
-    detected_neg <- sens_neg$influence$id[1:k]
+    detected_pos <- fast_sens_topk(mod, pos = tpos, sign = 1, k = k)
+    detected_neg <- fast_sens_topk(mod, pos = tpos, sign = -1, k = k)
     
     overlap_pos <- length(intersect(detected_pos, dgp_poisoned$true_outliers))
     overlap_neg <- length(intersect(detected_neg, dgp_poisoned$true_outliers))

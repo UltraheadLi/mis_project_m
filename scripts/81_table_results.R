@@ -9,11 +9,6 @@
 #          ../output/tables/tab_02_algorithmic_scaling.tex
 # ==============================================================================
 
-# ==============================================================================
-# File: script/81_table_results.R (Refactored for Thesis)
-# Purpose: Generates main-text LaTeX tables for diagnostic and algorithmic performance.
-# ==============================================================================
-
 library(dplyr)
 library(tidyr)
 library(knitr)
@@ -30,8 +25,33 @@ out_dir <- "../output/tables"
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 # Safely load data (using dummy data if missing for testing)
-res_02 <- if (file.exists(input_02)) readRDS(input_02) else data.frame() # Replace with actual fallback if needed
-res_03 <- if (file.exists(input_03)) readRDS(input_03) else data.frame() 
+res_02 <- if (file.exists(input_02)) readRDS(input_02) else data.frame()
+res_03 <- if (file.exists(input_03)) readRDS(input_03) else data.frame()
+
+# ------------------------------------------------------------------------------
+# DEFENSIVE COLUMN GUARD FOR res_03
+# ------------------------------------------------------------------------------
+if (nrow(res_03) > 0) {
+  res_03_required <- c("converged_exact", "converged_greedy",
+                       "detection_rate_exact", "detection_rate",
+                       "p_exact", "p_greedy", "cpu_exact", "cpu_greedy")
+  missing_03 <- setdiff(res_03_required, names(res_03))
+  if (length(missing_03) > 0) {
+    message(
+      "WARNING [81_table_results.R]: res_03 is missing columns — likely stale chunks.\n",
+      "  Missing: ", paste(missing_03, collapse = ", "), "\n",
+      "  Fix: delete ../output/temp_03/ and re-run Script 03.\n",
+      "  Patching with NA/FALSE for now so tables can still be generated."
+    )
+    for (col in missing_03) {
+      if (col %in% c("converged_exact", "converged_greedy")) {
+        res_03[[col]] <- FALSE
+      } else {
+        res_03[[col]] <- NA_real_
+      }
+    }
+  }
+}
 
 # Helper: Clean names for publication
 clean_names <- function(x) {
