@@ -48,7 +48,7 @@ set.seed(sim_params$seed)
 
 # --- Sample size × Contamination proportion grid ---
 n_obs_grid       <- c(500, 1000, 2500, 5000)
-contam_prop_grid <- c(0.01, 0.05, 0.10, 0.20)
+contam_prop_grid <- c(0.005, 0.01, 0.025, 0.05, 0.10)
 
 # Build the (n, contam_prop) design with feasibility guard
 nk_grid <- expand.grid(
@@ -500,7 +500,7 @@ results %>%
   geom_boxplot(outlier.size = 0.3, width = 0.7) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
   coord_flip() +
-  labs(title = "MIS Shape Parameter (xi) by Error Distribution and n",
+  labs(title = "EVD Shape Parameter (xi) by Error Distribution and n",
        x = NULL, y = "Shape (xi)", fill = "n") +
   theme_minimal(base_size = 10) -> p6
 print(p6)

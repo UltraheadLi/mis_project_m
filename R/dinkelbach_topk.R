@@ -3,8 +3,40 @@
 # Purpose: General-purpose exact MIS detection via Dinkelbach's method for
 #          linear-fractional programming. Finds the k observations whose joint
 #          removal maximally shifts a target coefficient in a given direction.
-# ==============================================================================
 #
+# Theory:
+#   The set-DFBETA for removing set S from OLS(y ~ X) on coefficient j is:
+#
+#       DFBETA_j(S) = e_j' (X'X)^{-1} X_S' (I - H_SS)^{-1} r_S
+#
+#   For the univariate FWL-orthogonalised case (regress out all but x_j),
+#   this simplifies to a linear-fractional program:
+#
+#       max_S  sum_{i in S} x_i r_i  /  (sum_{all} x_i^2 - sum_{i in S} x_i^2)
+#
+#   Dinkelbach's method solves this exactly by iterating:
+#     1. Form weights w_i = n_i - lambda * d_i
+#     2. Select the top-k by w_i
+#     3. Update lambda = sum(n[top_k]) / (C + sum(d[top_k]))
+#   until convergence. This is guaranteed to converge to the global optimum
+#   in O(k * n) per iteration, typically 3-8 iterations.
+#
+# Interface:
+#   Two entry points are provided:
+#     1. dinkelbach_topk()    — low-level, works on raw vectors (X, R)
+#     2. dinkelbach_topk_lm() — high-level, works on an lm object
+#                               (drop-in replacement for fast_sens_topk)
+#
+# Performance:
+#   - O(n log n) per Dinkelbach iteration (dominated by partial sort)
+#   - Typically 3-8 iterations to converge (guaranteed monotone)
+#   - Comparable wall-clock to fast_sens_topk for n < 5000
+#   - Exact: no approximation, no refinement loop needed
+#
+# Called by: /R/sim_robust_engine.R, /script/04_compare_robust.R
+# ==============================================================================
+
+
 #' Exact MIS Detection via Dinkelbach's Method (Low-Level)
 #'
 #' Finds the k indices from candidate vectors (x, r) that maximise the

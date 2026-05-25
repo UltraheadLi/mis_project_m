@@ -81,6 +81,9 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
       detection_success = NA, detect_cooks = NA, detect_lev = NA,
       detect_dfbetas = NA, overlap_mis = NA, overlap_cooks = NA,
       overlap_lev = NA, overlap_dfbetas = NA,
+      dfb_detected = NA_real_, dfb_injected = NA_real_,
+      mean_lev_detected = NA_real_, mean_lev_injected = NA_real_,
+      mean_res_detected = NA_real_, mean_res_injected = NA_real_,
       cover_evd = NA, cover_cooks = NA, cover_lev = NA, cover_dfbetas = NA,
       evd_test_type = if (outlier_method != "none") "injected" else "random",
       compute_time = compute_time,
@@ -128,7 +131,7 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
       empirical_mis <- empirical_mis_pos
     }
     detection_success <- (length(intersect(true_injected_indices, 
-                                           empirical_mis)) / k) >= 0.80
+                                           empirical_mis)) / k) >= 0.90
   } else {
     detection_success <- NA
     empirical_mis <- empirical_mis_pos
@@ -167,6 +170,34 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
     overlap_dfbetas <- NA
   }
   
+  # -------------------------------------------------------------------------
+  # 2c. FWL Decomposition Diagnostics
+  # -------------------------------------------------------------------------
+  if (outlier_method != "none") {
+    Z_diag <- matrix(1, nrow = n, ncol = 1)
+    fwl_vars <- fwl(y = dat$y, X = dat$X[, 1], Z = Z_diag)
+    X_fwl <- fwl_vars[, 2]
+    Y_fwl <- fwl_vars[, 1]
+
+    dfb_detected <- dfbeta_numeric(Y_fwl, cbind(X_fwl), empirical_mis, col_X = 1L)
+    dfb_injected <- dfbeta_numeric(Y_fwl, cbind(X_fwl), true_injected_indices, col_X = 1L)
+
+    h_vals  <- hatvalues(base_model)
+    r_vals  <- abs(residuals(base_model))
+
+    mean_lev_detected <- mean(h_vals[empirical_mis])
+    mean_lev_injected <- mean(h_vals[true_injected_indices])
+    mean_res_detected <- mean(r_vals[empirical_mis])
+    mean_res_injected <- mean(r_vals[true_injected_indices])
+  } else {
+    dfb_detected      <- NA_real_
+    dfb_injected      <- NA_real_
+    mean_lev_detected <- NA_real_
+    mean_lev_injected <- NA_real_
+    mean_res_detected <- NA_real_
+    mean_res_injected <- NA_real_
+  }
+
   # -------------------------------------------------------------------------
   # 3. Determine the EVD test set
   # -------------------------------------------------------------------------
@@ -266,6 +297,13 @@ run_mis_iteration <- function(iter = 1, n = 1000, p = 1,
     overlap_cooks = overlap_cooks,
     overlap_lev = overlap_lev,
     overlap_dfbetas = overlap_dfbetas,
+    # FWL decomposition diagnostics
+    dfb_detected = as.numeric(dfb_detected),
+    dfb_injected = as.numeric(dfb_injected),
+    mean_lev_detected = mean_lev_detected,
+    mean_lev_injected = mean_lev_injected,
+    mean_res_detected = mean_res_detected,
+    mean_res_injected = mean_res_injected,
     # Coverage — threshold-based flagging (power or size)
     cover_evd = cover_evd,
     cover_cooks = cover_cooks,

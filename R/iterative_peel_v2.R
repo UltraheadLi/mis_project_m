@@ -4,6 +4,17 @@
 #          MM-estimator anchor with a self-contained direction rule based on
 #          residual standard error (sigma) reduction.
 #
+# Key change from v1:
+#   v1: Direction is chosen by proximity to a pre-computed MM beta_anchor.
+#       This creates a circular dependency — MIS's quality depends on the
+#       MM estimator's quality, which can itself be compromised by masking.
+#
+#   v2: Direction is chosen by which removal most REDUCES sigma_hat (the
+#       residual standard error of the clean OLS). No external anchor needed.
+#       The logic: genuine outlier removal tightens the fit (sigma drops);
+#       signal removal loosens it (sigma rises or stagnates). This provides
+#       both a direction rule AND a natural stopping criterion.
+#
 # Stopping rules (whichever triggers first):
 #   1. Sigma-stagnation stop: neither direction reduces sigma by more than
 #      `sigma_tol` fraction — we've run out of outliers to peel.
